@@ -129,7 +129,7 @@
 
                 for (const file of files) {
                     // jpg, png 등 이미지 파일만 걸러내기
-                    if (file.type === 'file' && file.name.match(/\.(jpg|jpeg|png)$/i)) {
+                    if (file.type === 'file' && file.name.match(/\.(JPG|jpg|jpeg|png)$/i)) {
                         try {
                             // exifr로 GPS 메타데이터 추출
                             let gps = await exifr.gps(file.download_url);
