@@ -4,43 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>24단지 환경 개선 및 시설물 관리 지도</title>
-    <!-- 네이버 지도 API (ClientID 유지) -->
+    <!-- 동대표님이 찾아주신 정확한 네이버 지도 API 스크립트 -->
     <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=regdajez52"></script>
-    <!-- 사진에서 위치(GPS)를 자동으로 읽어주는 도구 (풀버전) -->
     <script src="https://cdn.jsdelivr.net/npm/exifr/dist/exifr.umd.js"></script>
     
     <style>
         body { font-family: 'Malgun Gothic', sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; }
         .container { max-width: 1200px; margin: 0 auto; }
-        
-        /* 1. 경고문 및 안내문 스타일 */
         .notice-box { background-color: #fff; border-left: 5px solid #d9534f; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .notice-box h2 { margin-top: 0; color: #d9534f; font-size: 18px; }
         .notice-box p { margin: 5px 0; font-size: 14px; line-height: 1.5; }
         .contact { font-weight: bold; color: #0275d8; }
 
-        /* 2. 컨트롤 패널 (업로드 제거, 필터만 남김) */
         .control-panel { background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .filter-section { display: flex; gap: 15px; align-items: center; font-size: 16px; }
         .filter-section label { cursor: pointer; display: flex; align-items: center; gap: 5px; font-weight: bold; }
 
-        /* 3. 메인 레이아웃 (지도 + 사진첩) */
-        .main-layout { display: flex; gap: 20px; height: 600px; }
-        #map { flex: 2; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        
-        /* 4. 사진첩 스타일 */
-        .gallery-container { flex: 1; background: #fff; padding: 15px; border-radius: 8px; overflow-y: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .main-layout { display: flex; gap: 20px; min-height: 600px; }
+        #map { flex: 2; width: 100%; min-height: 600px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); background-color: #e9ecef; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        .gallery-container { flex: 1; background: #fff; padding: 15px; border-radius: 8px; overflow-y: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-height: 600px; }
         .gallery-container h3 { margin-top: 0; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .gallery-item { position: relative; cursor: pointer; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; }
         .gallery-item img { width: 100%; height: 120px; object-fit: cover; display: block; }
         .gallery-item .tag { position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.7); color: white; padding: 2px 6px; font-size: 11px; border-radius: 4px; }
 
-        /* 5. 지도 위 마커 (아이폰 썸네일 스타일) */
         .map-marker { width: 44px; height: 44px; border-radius: 50%; border: 3px solid white; box-shadow: 0 3px 6px rgba(0,0,0,0.4); overflow: hidden; background: #ccc; cursor: pointer; }
         .map-marker img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* 6. 사진 크게 보기 모달 */
         #image-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
         #image-modal img { max-width: 90%; max-height: 80%; border-radius: 8px; border: 5px solid white; }
         #image-modal .close-btn { color: white; font-size: 30px; margin-bottom: 10px; cursor: pointer; font-weight: bold; }
@@ -50,7 +41,6 @@
 <body>
 
 <div class="container">
-    <!-- 경고문 및 제보 안내 -->
     <div class="notice-box">
         <h2>⚠️ 24단지 환경 개선 활동 전용 시스템</h2>
         <p><strong>[경고]</strong> 본 사이트는 24단지 내 시설물(금연표지판, 안내판 등)의 체계적인 관리와 주거 환경 개선을 목적으로만 운영됩니다.<br>
@@ -58,7 +48,6 @@
         <p class="contact">📸 단지 내 시설물 사진 제보 및 기타 문의: <a href="mailto:valuableahn@gmail.com">valuableahn@gmail.com</a></p>
     </div>
 
-    <!-- 컨트롤 패널 (오직 보기 필터만 존재) -->
     <div class="control-panel">
         <div class="filter-section">
             <span style="color: #555;">👀 지도에 표시할 항목:</span>
@@ -68,19 +57,18 @@
         </div>
     </div>
 
-    <!-- 메인 화면 (지도 + 사진첩) -->
     <div class="main-layout">
-        <div id="map"></div>
+        <div id="map">
+            <h3 id="loading-msg" style="color: #0275d8;">📡 사진 및 지도 데이터를 불러오는 중입니다...</h3>
+            <p id="loading-sub" style="color: #666;">(폴더에서 사진을 찾는 중입니다. 잠시만 기다려주세요)</p>
+        </div>
         <div class="gallery-container">
             <h3>등록된 사진첩</h3>
-            <div class="gallery" id="photo-gallery">
-                <!-- 사진들이 여기에 표시됩니다 -->
-            </div>
+            <div class="gallery" id="photo-gallery"></div>
         </div>
     </div>
 </div>
 
-<!-- 큰 사진 보기 모달 창 -->
 <div id="image-modal">
     <div class="close-btn" onclick="closeModal()">✖ 닫기</div>
     <img id="modal-img" src="" alt="확대 사진">
@@ -92,109 +80,113 @@
     let photoDataList = []; 
     let markerList = [];
 
-    // =========================================================================
-    // ⭐️ 관리자(동대표) 사진 등록 구역 ⭐️
-    // 깃허브에 사진을 올리신 후, 아래 양식에 맞춰 파일명과 분류를 적어주세요.
-    // 위치(GPS)는 파일에서 컴퓨터가 알아서 뽑아냅니다!
-    // =========================================================================
-    const registeredPhotos = [
-        // 예시: { file: "photo1.jpg", category: "금연표지판" },
-        // 예시: { file: "photo2.jpg", category: "안내판" }
-        // 아직 사진이 없다면 이 아래는 비워두시면 됩니다.
-        
-    ];
-    // =========================================================================
+    // 💡 깃허브 저장소 정보 (자동화를 위한 핵심 설정)
+    const githubOwner = 'valuableahn-prog';
+    const githubRepo = 'songpadream';
+    const foldersToFetch = ['금연표지판', '안내판', '기타'];
 
-    // 1. 페이지가 열리면 가장 먼저 실행되는 함수
     window.onload = async function() {
-        // 기본 지도 띄우기 (위례 24단지 인근)
-        map = new naver.maps.Map('map', {
-            center: new naver.maps.LatLng(37.4784, 127.1432), 
-            zoom: 16
-        });
+        if (typeof naver === 'undefined' || typeof naver.maps === 'undefined') {
+            document.getElementById('map').innerHTML = `
+                <div style="text-align: center; color: #d9534f;">
+                    <h3>🚨 네이버 지도 API 연결 실패!</h3>
+                    <p>도메인 주소가 올바른지 확인해주세요.</p>
+                </div>`;
+            return;
+        }
 
-        // 사진 파일들에서 위치 정보를 자동으로 빼오는 작업 시작
-        await loadPhotosFromList();
+        try {
+            map = new naver.maps.Map('map', {
+                center: new naver.maps.LatLng(37.4784, 127.1432), // 24단지 기본 좌표
+                zoom: 16
+            });
+
+            // 깃허브 폴더에서 사진 데이터를 싹 다 긁어오기
+            await fetchPhotosFromGithubFolders();
+            
+            document.getElementById('loading-msg').style.display = 'none';
+            document.getElementById('loading-sub').style.display = 'none';
+            
+            updateView();
+        } catch (error) {
+            document.getElementById('map').innerHTML = `<p style="color:red;">오류 발생: ${error.message}</p>`;
+        }
     };
 
-    // 2. 입력된 사진 목록에서 GPS를 빼내어 지도 데이터를 만드는 함수
-    async function loadPhotosFromList() {
-        for (let data of registeredPhotos) {
+    // 🌟 대망의 깃허브 폴더 자동 인식 함수
+    async function fetchPhotosFromGithubFolders() {
+        for (const folderName of foldersToFetch) {
             try {
-                // 사진 파일에서 GPS 정보 추출
-                let gps = await exifr.gps(data.file);
-                if (gps) {
-                    photoDataList.push({
-                        url: data.file,
-                        lat: gps.latitude,
-                        lng: gps.longitude,
-                        category: data.category
-                    });
-                } else {
-                    console.warn(data.file + " 파일에 위치(GPS) 정보가 없습니다.");
+                // 깃허브 API를 이용해 폴더 내용물 확인
+                const response = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${folderName}`);
+                
+                if (!response.ok) {
+                    console.warn(`[알림] '${folderName}' 폴더가 아직 없거나 비어있습니다.`);
+                    continue;
+                }
+
+                const files = await response.json();
+
+                for (const file of files) {
+                    // jpg, png 등 이미지 파일만 걸러내기
+                    if (file.type === 'file' && file.name.match(/\.(jpg|jpeg|png)$/i)) {
+                        try {
+                            // exifr로 GPS 메타데이터 추출
+                            let gps = await exifr.gps(file.download_url);
+                            if (gps) {
+                                photoDataList.push({
+                                    url: file.download_url,
+                                    lat: gps.latitude,
+                                    lng: gps.longitude,
+                                    category: folderName // 🎯 폴더 이름이 자동으로 분류(카테고리)가 됩니다!
+                                });
+                            }
+                        } catch (e) {
+                            console.warn("GPS 정보를 읽을 수 없는 사진: " + file.name);
+                        }
+                    }
                 }
             } catch (error) {
-                console.error(data.file + " 파일을 읽어오는데 실패했습니다.");
+                console.error("API 호출 중 오류:", error);
             }
         }
-        
-        // 데이터 정리가 끝났으니 화면에 지도 핀과 사진첩을 그립니다.
-        updateView();
     }
 
-    // 3. 필터에 맞게 지도 마커와 사진첩을 다시 그리는 함수
     function updateView() {
-        // 체크박스 상태 확인
         const checkedBoxes = document.querySelectorAll('.filter-cb:checked');
         const activeCategories = Array.from(checkedBoxes).map(cb => cb.value);
 
-        // 기존 마커 초기화
         markerList.forEach(marker => marker.setMap(null));
         markerList = [];
-        
-        // 사진첩 초기화
         const gallery = document.getElementById('photo-gallery');
         gallery.innerHTML = '';
 
-        // 사진이 하나라도 있으면 첫 번째 사진 위치로 지도 중심 이동
         if (photoDataList.length > 0) {
+            // 가장 첫 번째 사진의 위치로 지도 중심 이동
             map.setCenter(new naver.maps.LatLng(photoDataList[0].lat, photoDataList[0].lng));
         }
 
-        // 화면 그리기
         photoDataList.forEach(data => {
             if (activeCategories.includes(data.category)) {
-                // 1) 지도 마커 생성
                 const markerIconHtml = `
                     <div class="map-marker" onclick="openModal('${data.url}', '${data.category}')">
                         <img src="${data.url}">
-                    </div>
-                `;
-                
+                    </div>`;
                 const marker = new naver.maps.Marker({
                     position: new naver.maps.LatLng(data.lat, data.lng),
                     map: map,
-                    icon: {
-                        content: markerIconHtml,
-                        size: new naver.maps.Size(50, 50),
-                        anchor: new naver.maps.Point(25, 25)
-                    }
+                    icon: { content: markerIconHtml, size: new naver.maps.Size(50, 50), anchor: new naver.maps.Point(25, 25) }
                 });
                 markerList.push(marker);
 
-                // 2) 우측 갤러리 추가
                 const galleryItem = document.createElement('div');
                 galleryItem.className = 'gallery-item';
-                galleryItem.innerHTML = `
-                    <span class="tag">${data.category}</span>
-                    <img src="${data.url}" onclick="openModal('${data.url}', '${data.category}')">
-                `;
+                galleryItem.innerHTML = `<span class="tag">${data.category}</span><img src="${data.url}" onclick="openModal('${data.url}', '${data.category}')">`;
                 gallery.appendChild(galleryItem);
             }
         });
     }
 
-    // 4. 사진 크게 보기 (모달 창 열기/닫기)
     function openModal(imgUrl, category) {
         document.getElementById('modal-img').src = imgUrl;
         document.getElementById('modal-tag').innerText = `분류: ${category}`;
