@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>위례 24단지 시설물 지도</title>
+    <!-- 네이버 지도 API (Client ID 필수 입력) -->
+    <script type="text/javascript" src="https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=regdajez52"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; }
+        .header { background: #2c3e50; color: white; padding: 15px 20px; text-align: center; }
+        .admin-panel { background: #fff; padding: 15px; margin: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        #map { width: 100%; height: 75vh; }
+        .photo-popup { text-align: center; padding: 10px; width: 220px; }
+        .photo-popup img { width: 100%; max-height: 250px; object-fit: cover; border-radius: 5px; margin-top: 8px; border: 1px solid #ddd; }
+        button { background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #2980b9; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2>단지 내 표지판/안내판 위치 및 현황도</h2>
+    </div>
+
+    <!-- 관리자(동대표) 사진 등록 패널 -->
+    <div class="admin-panel">
+        <label><b>1. 분류 선택:</b></label>
+        <select id="categorySelect">
+            <option value="금연표지판">금연표지판 (빨간색)</option>
+            <option value="안내판">안내판 (파란색)</option>
+            <option value="기타">기타 (초록색)</option>
+        </select>
+        
+        <label style="margin-left: 15px;"><b>2. JPG 사진 등록 (여러 장 가능):</b></label>
+        <input type="file" id="photoInput" accept="image/jpeg, image/png" multiple>
+        
+        <button id="downloadBtn" style="margin-left: 15px; background: #e67e22;">3. 데이터 파일(data.json) 다운로드</button>
+        <p style="font-size: 13px; color: #666; margin-top: 10px;">
+            ※ 깃허브 'images' 폴더에 올린 사진과 <b>동일한 사진</b>을 등록해야 합니다. 사진 파일명(예: sign1.jpg)을 기준으로 지도가 연동됩니다.
+        </p>
+    </div>
+
+    <!-- 지도 영역 -->
+    <div id="map"></div>
+
+    <script>
+        // 아파트 단지 인근을 초기 중심 좌표로 설정
+        var map = new naver.maps.Map('map', {
+            center: new naver.maps.LatLng(37.4789, 127.1423), 
+            zoom: 17
+        });
+
+        var markersData = [];
+
+        const icons = {
+            "금연표지판": "http://static.naver.net/maps/img/icons/sp_pins_spot_b_red.png",
+            "안내판": "http://static.naver.net/maps/img/icons/sp_pins_spot_b_blue.png",
+            "기타": "http://static.naver.net/maps/img/icons/sp_pins_spot_b_green.png"
+        };
+
+        // 지도에 마커와 사진 팝업을 생성하는 함수
+        function createMarkerAndPopup(item) {
+            var position = new naver.maps.LatLng(item.lat, item.lng);
+            
+            var marker = new naver.maps.Marker({
+                position: position,
+                map: map,
+                icon: { url: icons[item.category] }
+            });
+
+            // 핵심: 마커 클릭 시 보여줄 정보창 (이미지 태그 포함)
+            // 깃허브의 images/ 폴더 안에 있는 파일명을 그대로 불러옵니다.
+            var infoWindow = new naver.maps.InfoWindow({
+                content: `
+                    <div class="photo-popup">
+                        <strong style="font-size:16px; color:#2c3e50;">${item.category}</strong>
+                        <img src="images/${item.filename}" alt="${item.filename}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Not+Found'">
+                        <div style="font-size:12px; color:#888; margin-top:5px;">파일명: ${item.filename}</div>
+                    </div>
+                `,
+                backgroundColor: "#fff",
+                borderWidth: 1,
+                anchorSize: new naver.maps.Size(10, 10)
+            });
+
+            naver.maps.Event.addListener(marker, "click", function() {
+                if (infoWindow.getMap()) {
+                    infoWindow.close();
+                } else {
+                    infoWindow.open(map, marker);
+                }
+            });
+        }
+
+        // 1. 기존에 저장된 data.json이 있다면 불러와서 지도에 그리기 (직원용)
+        fetch('data.json')
+            .then(response => response.json())
+            .then(data => {
+                markersData = data;
+                data.forEach(item => createMarkerAndPopup(item));
+            })
+            .catch(e => console.log("저장된 데이터 파일이 아직 없습니다. (초기 상태)"));
+
+        // 2. 동대표님이 사진을 올리면 GPS를 뽑고 마커를 그리는 기능 (관리용)
+        document.getElementById('photoInput').addEventListener('change', async function(e) {
+            const files = e.target.files;
+            const category = document.getElementById('categorySelect').value;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                try {
+                    const gps = await exifr.gps(file);
+                    if (gps && gps.latitude && gps.longitude) {
+                        const item = {
+                            filename: file.name, // 파일 이름(예: img1.jpg)을 저장
+                            category: category,
+                            lat: gps.latitude,
+                            lng: gps.longitude
+                        };
+                        markersData.push(item);
+                        createMarkerAndPopup(item);
+                        map.setCenter(new naver.maps.LatLng(gps.latitude, gps.longitude));
+                    } else {
+                        alert(file.name + " 파일에 위치(GPS) 정보가 없습니다.");
+                    }
+                } catch (error) {
+                    console.error("오류:", error);
+                }
+            }
+        });
+
+        // 3. 작업한 데이터를 JSON 파일로 다운로드 하는 기능
+        document.getElementById('downloadBtn').addEventListener('click', function() {
+            if(markersData.length === 0) {
+                alert("등록된 사진 데이터가 없습니다.");
+                return;
+            }
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(markersData, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "data.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        });
+    </script>
+</body>
+</html>
