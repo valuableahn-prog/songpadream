@@ -2,148 +2,221 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>위례 24단지 시설물 지도</title>
-    <!-- 네이버 지도 API (Client ID 필수 입력) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>24단지 환경 개선 및 시설물 관리 지도</title>
+    <!-- 네이버 지도 API (동대표님 Client ID 적용 완료) -->
     <script type="text/javascript" src="https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=regdajez52"></script>
+    <!-- 사진에서 GPS(위치) 정보를 뽑아내는 라이브러리 -->
     <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
+    
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; }
-        .header { background: #2c3e50; color: white; padding: 15px 20px; text-align: center; }
-        .admin-panel { background: #fff; padding: 15px; margin: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        #map { width: 100%; height: 75vh; }
-        .photo-popup { text-align: center; padding: 10px; width: 220px; }
-        .photo-popup img { width: 100%; max-height: 250px; object-fit: cover; border-radius: 5px; margin-top: 8px; border: 1px solid #ddd; }
-        button { background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
-        button:hover { background: #2980b9; }
+        body { font-family: 'Malgun Gothic', sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        /* 경고문 및 안내문 스타일 */
+        .notice-box { background-color: #fff; border-left: 5px solid #d9534f; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .notice-box h2 { margin-top: 0; color: #d9534f; font-size: 18px; }
+        .notice-box p { margin: 5px 0; font-size: 14px; line-height: 1.5; }
+        .contact { font-weight: bold; color: #0275d8; }
+
+        /* 컨트롤 패널 (업로드 및 필터) */
+        .control-panel { background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .upload-section, .filter-section { display: flex; gap: 10px; align-items: center; }
+        button { padding: 8px 15px; background-color: #5cb85c; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #4cae4c; }
+
+        /* 메인 레이아웃 (지도 + 사진첩) */
+        .main-layout { display: flex; gap: 20px; height: 600px; }
+        #map { flex: 2; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        
+        /* 사진첩 스타일 */
+        .gallery-container { flex: 1; background: #fff; padding: 15px; border-radius: 8px; overflow-y: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .gallery-container h3 { margin-top: 0; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .gallery-item { position: relative; cursor: pointer; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; }
+        .gallery-item img { width: 100%; height: 120px; object-fit: cover; display: block; }
+        .gallery-item .tag { position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.7); color: white; padding: 2px 6px; font-size: 11px; border-radius: 4px; }
+
+        /* 지도 위 마커 (아이폰 썸네일 스타일) */
+        .map-marker { width: 44px; height: 44px; border-radius: 50%; border: 3px solid white; box-shadow: 0 3px 6px rgba(0,0,0,0.4); overflow: hidden; background: #ccc; cursor: pointer; }
+        .map-marker img { width: 100%; height: 100%; object-fit: cover; }
+
+        /* 사진 크게 보기 모달 */
+        #image-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
+        #image-modal img { max-width: 90%; max-height: 80%; border-radius: 8px; border: 5px solid white; }
+        #image-modal .close-btn { color: white; font-size: 30px; margin-bottom: 10px; cursor: pointer; }
+        #modal-tag { color: white; margin-top: 10px; font-size: 18px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <h2>단지 내 표지판/안내판 위치 및 현황도</h2>
+<div class="container">
+    <!-- 1. 경고문 및 제보 안내 -->
+    <div class="notice-box">
+        <h2>⚠️ 24단지 환경 개선 활동 전용 시스템</h2>
+        <p><strong>[경고]</strong> 본 사이트는 24단지 내 시설물(금연표지판, 안내판 등)의 체계적인 관리와 주거 환경 개선을 목적으로만 운영됩니다.<br>
+        사이트 내의 지도 데이터, 현장 사진, 위치 정보 등을 무단으로 복제, 캡처, 배포하거나 상업적 및 기타 사적인 용도로 사용하는 것을 <strong>절대 금지</strong>합니다.</p>
+        <p class="contact">📸 단지 내 시설물 사진 제보 및 기타 문의: <a href="mailto:valuableahn@gmail.com">valuableahn@gmail.com</a></p>
     </div>
 
-    <!-- 관리자(동대표) 사진 등록 패널 -->
-    <div class="admin-panel">
-        <label><b>1. 분류 선택:</b></label>
-        <select id="categorySelect">
-            <option value="금연표지판">금연표지판 (빨간색)</option>
-            <option value="안내판">안내판 (파란색)</option>
-            <option value="기타">기타 (초록색)</option>
-        </select>
+    <!-- 2. 컨트롤 패널 (업로드 및 필터) -->
+    <div class="control-panel">
+        <div class="upload-section">
+            <select id="category-select">
+                <option value="금연표지판">🚭 금연표지판</option>
+                <option value="안내판">ℹ️ 안내판</option>
+                <option value="기타">🔹 기타</option>
+            </select>
+            <input type="file" id="file-input" accept="image/*">
+            <button onclick="processImage()">지도 및 사진첩에 등록</button>
+        </div>
         
-        <label style="margin-left: 15px;"><b>2. JPG 사진 등록 (여러 장 가능):</b></label>
-        <input type="file" id="photoInput" accept="image/jpeg, image/png" multiple>
-        
-        <button id="downloadBtn" style="margin-left: 15px; background: #e67e22;">3. 데이터 파일(data.json) 다운로드</button>
-        <p style="font-size: 13px; color: #666; margin-top: 10px;">
-            ※ 깃허브 'images' 폴더에 올린 사진과 <b>동일한 사진</b>을 등록해야 합니다. 사진 파일명(예: sign1.jpg)을 기준으로 지도가 연동됩니다.
-        </p>
+        <div class="filter-section">
+            <strong>보기 필터:</strong>
+            <label><input type="checkbox" class="filter-cb" value="금연표지판" checked onchange="updateView()"> 금연표지판</label>
+            <label><input type="checkbox" class="filter-cb" value="안내판" checked onchange="updateView()"> 안내판</label>
+            <label><input type="checkbox" class="filter-cb" value="기타" checked onchange="updateView()"> 기타</label>
+        </div>
     </div>
 
-    <!-- 지도 영역 -->
-    <div id="map"></div>
+    <!-- 3. 메인 화면 (지도 + 사진첩) -->
+    <div class="main-layout">
+        <div id="map"></div>
+        <div class="gallery-container">
+            <h3>등록된 사진첩</h3>
+            <div class="gallery" id="photo-gallery">
+                <!-- 사진들이 여기에 표시됩니다 -->
+            </div>
+        </div>
+    </div>
+</div>
 
-    <script>
-        // 아파트 단지 인근을 초기 중심 좌표로 설정
-        var map = new naver.maps.Map('map', {
-            center: new naver.maps.LatLng(37.4789, 127.1423), 
-            zoom: 17
+<!-- 큰 사진 보기 모달 창 -->
+<div id="image-modal">
+    <div class="close-btn" onclick="closeModal()">✖ 닫기</div>
+    <img id="modal-img" src="" alt="확대 사진">
+    <div id="modal-tag"></div>
+</div>
+
+<script>
+    let map;
+    let photoDataList = []; // 업로드된 사진과 위치 데이터를 저장할 배열
+    let markerList = [];    // 지도에 찍힌 마커들을 관리할 배열
+
+    // 1. 네이버 지도 초기화 (기본 중심 좌표: 서울 송파구 위례 인근)
+    window.onload = function() {
+        map = new naver.maps.Map('map', {
+            center: new naver.maps.LatLng(37.4784, 127.1432), 
+            zoom: 15
         });
+    };
 
-        var markersData = [];
+    // 2. 사진 업로드 및 처리 함수
+    async function processImage() {
+        const fileInput = document.getElementById('file-input');
+        const category = document.getElementById('category-select').value;
+        const file = fileInput.files[0];
 
-        const icons = {
-            "금연표지판": "http://static.naver.net/maps/img/icons/sp_pins_spot_b_red.png",
-            "안내판": "http://static.naver.net/maps/img/icons/sp_pins_spot_b_blue.png",
-            "기타": "http://static.naver.net/maps/img/icons/sp_pins_spot_b_green.png"
-        };
-
-        // 지도에 마커와 사진 팝업을 생성하는 함수
-        function createMarkerAndPopup(item) {
-            var position = new naver.maps.LatLng(item.lat, item.lng);
-            
-            var marker = new naver.maps.Marker({
-                position: position,
-                map: map,
-                icon: { url: icons[item.category] }
-            });
-
-            // 핵심: 마커 클릭 시 보여줄 정보창 (이미지 태그 포함)
-            // 깃허브의 images/ 폴더 안에 있는 파일명을 그대로 불러옵니다.
-            var infoWindow = new naver.maps.InfoWindow({
-                content: `
-                    <div class="photo-popup">
-                        <strong style="font-size:16px; color:#2c3e50;">${item.category}</strong>
-                        <img src="images/${item.filename}" alt="${item.filename}" onerror="this.src='https://via.placeholder.com/200x200?text=Image+Not+Found'">
-                        <div style="font-size:12px; color:#888; margin-top:5px;">파일명: ${item.filename}</div>
-                    </div>
-                `,
-                backgroundColor: "#fff",
-                borderWidth: 1,
-                anchorSize: new naver.maps.Size(10, 10)
-            });
-
-            naver.maps.Event.addListener(marker, "click", function() {
-                if (infoWindow.getMap()) {
-                    infoWindow.close();
-                } else {
-                    infoWindow.open(map, marker);
-                }
-            });
+        if (!file) {
+            alert("사진 파일을 먼저 선택해주세요!");
+            return;
         }
 
-        // 1. 기존에 저장된 data.json이 있다면 불러와서 지도에 그리기 (직원용)
-        fetch('data.json')
-            .then(response => response.json())
-            .then(data => {
-                markersData = data;
-                data.forEach(item => createMarkerAndPopup(item));
-            })
-            .catch(e => console.log("저장된 데이터 파일이 아직 없습니다. (초기 상태)"));
-
-        // 2. 동대표님이 사진을 올리면 GPS를 뽑고 마커를 그리는 기능 (관리용)
-        document.getElementById('photoInput').addEventListener('change', async function(e) {
-            const files = e.target.files;
-            const category = document.getElementById('categorySelect').value;
-
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                try {
-                    const gps = await exifr.gps(file);
-                    if (gps && gps.latitude && gps.longitude) {
-                        const item = {
-                            filename: file.name, // 파일 이름(예: img1.jpg)을 저장
-                            category: category,
-                            lat: gps.latitude,
-                            lng: gps.longitude
-                        };
-                        markersData.push(item);
-                        createMarkerAndPopup(item);
-                        map.setCenter(new naver.maps.LatLng(gps.latitude, gps.longitude));
-                    } else {
-                        alert(file.name + " 파일에 위치(GPS) 정보가 없습니다.");
-                    }
-                } catch (error) {
-                    console.error("오류:", error);
-                }
-            }
-        });
-
-        // 3. 작업한 데이터를 JSON 파일로 다운로드 하는 기능
-        document.getElementById('downloadBtn').addEventListener('click', function() {
-            if(markersData.length === 0) {
-                alert("등록된 사진 데이터가 없습니다.");
+        try {
+            // EXIF 데이터에서 GPS 추출
+            let gps = await exifr.gps(file);
+            if (!gps) {
+                alert("사진에 위치(GPS) 정보가 없습니다. 아이폰 설정에서 '위치 서비스'가 켜진 상태로 찍은 사진이어야 합니다.");
                 return;
             }
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(markersData, null, 2));
-            const downloadAnchorNode = document.createElement('a');
-            downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", "data.json");
-            document.body.appendChild(downloadAnchorNode);
-            downloadAnchorNode.click();
-            downloadAnchorNode.remove();
+
+            // 사진을 화면에 보여주기 위해 임시 주소(URL) 생성
+            const imageUrl = URL.createObjectURL(file);
+            
+            // 데이터 저장
+            const photoData = {
+                url: imageUrl,
+                lat: gps.latitude,
+                lng: gps.longitude,
+                category: category
+            };
+            
+            photoDataList.push(photoData);
+            
+            // 지도 중심을 방금 올린 사진 위치로 이동
+            map.setCenter(new naver.maps.LatLng(gps.latitude, gps.longitude));
+            
+            // 화면 새로고침 (마커 및 사진첩 업데이트)
+            updateView();
+            
+            // 입력창 초기화
+            fileInput.value = "";
+            alert("성공적으로 등록되었습니다!");
+
+        } catch (error) {
+            alert("사진을 처리하는 중 오류가 발생했습니다.");
+            console.error(error);
+        }
+    }
+
+    // 3. 필터에 맞게 지도 마커와 사진첩을 다시 그리는 함수
+    function updateView() {
+        // 선택된 카테고리 확인
+        const checkedBoxes = document.querySelectorAll('.filter-cb:checked');
+        const activeCategories = Array.from(checkedBoxes).map(cb => cb.value);
+
+        // 기존 지도 마커 전부 지우기
+        markerList.forEach(marker => marker.setMap(null));
+        markerList = [];
+        
+        // 사진첩 HTML 초기화
+        const gallery = document.getElementById('photo-gallery');
+        gallery.innerHTML = '';
+
+        // 데이터 순회하며 화면에 그리기
+        photoDataList.forEach(data => {
+            if (activeCategories.includes(data.category)) {
+                // 1) 지도에 아이폰 스타일 썸네일 마커 추가
+                const markerIconHtml = `
+                    <div class="map-marker" onclick="openModal('${data.url}', '${data.category}')">
+                        <img src="${data.url}">
+                    </div>
+                `;
+                
+                const marker = new naver.maps.Marker({
+                    position: new naver.maps.LatLng(data.lat, data.lng),
+                    map: map,
+                    icon: {
+                        content: markerIconHtml,
+                        size: new naver.maps.Size(50, 50),
+                        anchor: new naver.maps.Point(25, 25)
+                    }
+                });
+                markerList.push(marker);
+
+                // 2) 우측 사진첩에 썸네일 추가
+                const galleryItem = document.createElement('div');
+                galleryItem.className = 'gallery-item';
+                galleryItem.innerHTML = `
+                    <span class="tag">${data.category}</span>
+                    <img src="${data.url}" onclick="openModal('${data.url}', '${data.category}')">
+                `;
+                gallery.appendChild(galleryItem);
+            }
         });
-    </script>
+    }
+
+    // 4. 사진 크게 보기 (모달 창 열기/닫기)
+    function openModal(imgUrl, category) {
+        document.getElementById('modal-img').src = imgUrl;
+        document.getElementById('modal-tag').innerText = `분류: ${category}`;
+        document.getElementById('image-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('image-modal').style.display = 'none';
+    }
+</script>
+
 </body>
 </html>
